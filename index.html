@@ -1,0 +1,355 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codeforces Helper</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header
+      class="bg-blue-600 text-white text-center py-4 text-2xl font-bold shadow-md"
+    >
+      Codeforces Helper
+    </header>
+
+    <!-- Main -->
+    <main class="max-w-5xl mx-auto p-6 space-y-6">
+      <!-- Form -->
+      <form id="form" class="flex gap-2 items-center mb-6">
+        <input
+          type="text"
+          name="handle"
+          id="handle"
+          placeholder="Enter your Codeforces handle"
+          class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="submit"
+          class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+        >
+          Submit
+        </button>
+      </form>
+
+      <!-- Section toggle -->
+      <div>
+        <label class="block mb-2 font-semibold">Select Sections to Show:</label>
+        <select id="sectionToggle" multiple class="w-full p-2 border rounded">
+          <option value="tagMastery" selected>Tag Mastery Index</option>
+          <option value="heatmap" selected>Problem Rating Heatmap</option>
+          <option value="unsolved" selected>Unsolved Problems</option>
+          <option value="speed" selected>Average Speed of Solving</option>
+          <option value="contests" selected>Strongest Contest Rounds</option>
+        </select>
+        <p class="text-sm text-gray-500 mt-1">
+          Hold Ctrl (or Cmd on Mac) to select multiple.
+        </p>
+      </div>
+
+      <!-- Results -->
+      <div id="results" class="hidden space-y-6">
+        <!-- Tag Mastery -->
+        <section id="tagMastery">
+          <h2 class="text-xl font-semibold mb-2">Tag Mastery Index</h2>
+          <table
+            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
+          >
+            <thead class="bg-gray-200">
+              <tr>
+                <th class="p-2 border">Tag</th>
+                <th class="p-2 border">Solved</th>
+                <th class="p-2 border">%</th>
+              </tr>
+            </thead>
+            <tbody id="tagMasteryTable"></tbody>
+          </table>
+        </section>
+
+        <!-- Heatmap -->
+        <section id="heatmap">
+          <h2 class="text-xl font-semibold mb-2">Problem Rating Heatmap</h2>
+          <div
+            id="heatmapContent"
+            class="grid grid-flow-col gap-2 overflow-x-auto"
+          ></div>
+        </section>
+
+        <!-- Unsolved -->
+        <section id="unsolved">
+          <h2 class="text-xl font-semibold mb-2">Unsolved Problems</h2>
+          <ul id="unsolvedList" class="space-y-2"></ul>
+        </section>
+
+        <!-- Speed -->
+        <section id="speed">
+          <h2 class="text-xl font-semibold mb-2">
+            Average Speed of Solving (by Tag)
+          </h2>
+          <table
+            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
+          >
+            <thead class="bg-gray-200">
+              <tr>
+                <th class="p-2 border">Tag</th>
+                <th class="p-2 border">Solved</th>
+                <th class="p-2 border">Avg Time to Solve (mins)</th>
+              </tr>
+            </thead>
+            <tbody id="speedTable"></tbody>
+          </table>
+        </section>
+
+        <!-- Contests -->
+        <section id="contests">
+          <h2 class="text-xl font-semibold mb-2">Strongest Contest Rounds</h2>
+          <table
+            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
+          >
+            <thead class="bg-gray-200">
+              <tr>
+                <th class="p-2 border">Division</th>
+                <th class="p-2 border">Solved</th>
+                <th class="p-2 border">Total</th>
+                <th class="p-2 border">Accuracy</th>
+              </tr>
+            </thead>
+            <tbody id="contestTable"></tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- Loading / Error -->
+      <div id="loading" class="text-center text-gray-600 hidden">
+        Loading...
+      </div>
+      <div id="error" class="text-center text-red-600 hidden"></div>
+    </main>
+
+    <!-- Script -->
+    <script>
+      const form = document.getElementById("form");
+      const resultsDiv = document.getElementById("results");
+      const tagMasteryTable = document.getElementById("tagMasteryTable");
+      const heatmapContent = document.getElementById("heatmapContent");
+      const unsolvedList = document.getElementById("unsolvedList");
+      const speedTable = document.getElementById("speedTable");
+      const contestTable = document.getElementById("contestTable");
+      const loading = document.getElementById("loading");
+      const errorDiv = document.getElementById("error");
+      const sectionToggle = document.getElementById("sectionToggle");
+
+      // Toggle sections
+      sectionToggle.addEventListener("change", () => {
+        const selected = Array.from(sectionToggle.selectedOptions).map(
+          o => o.value
+        );
+        ["tagMastery", "heatmap", "unsolved", "speed", "contests"].forEach(
+          id => {
+            document.getElementById(id).style.display = selected.includes(id)
+              ? "block"
+              : "none";
+          }
+        );
+      });
+
+      form.addEventListener("submit", async e => {
+        e.preventDefault();
+        resultsDiv.classList.add("hidden");
+        errorDiv.classList.add("hidden");
+        tagMasteryTable.innerHTML = "";
+        heatmapContent.innerHTML = "";
+        unsolvedList.innerHTML = "";
+        speedTable.innerHTML = "";
+        contestTable.innerHTML = "";
+        loading.classList.remove("hidden");
+
+        const handle = document.getElementById("handle").value.trim();
+        if (!handle) {
+          loading.classList.add("hidden");
+          errorDiv.textContent = "Please enter a valid handle.";
+          errorDiv.classList.remove("hidden");
+          return;
+        }
+
+        try {
+          // Fetch submissions
+          const res = await fetch(
+            `https://codeforces.com/api/user.status?handle=${handle}&from=1&count=10000`
+          );
+          const data = await res.json();
+          if (data.status !== "OK")
+            throw new Error(data.comment || "Failed to fetch data.");
+          const subs = data.result;
+
+          // Contest names map
+          const contestIds = [
+            ...new Set(subs.map(s => s.problem.contestId).filter(Boolean))
+          ];
+          const contestMap = {};
+          if (contestIds.length) {
+            const cRes = await fetch(
+              `https://codeforces.com/api/contest.list?gym=false`
+            );
+            const cData = await cRes.json();
+            if (cData.status === "OK") {
+              cData.result.forEach(c => (contestMap[c.id] = c.name));
+            }
+          }
+
+          // Data holders
+          const solvedSet = new Set();
+          const tagCounts = {};
+          const ratingCounts = {};
+          const tagSolveTimes = {};
+          const contests = {};
+          const unsolvedSet = new Set();
+          const problemAttempts = {};
+
+          subs.forEach(sub => {
+            if (!sub.problem) return;
+            const pid = sub.problem.contestId + sub.problem.index;
+            const tags = sub.problem.tags || [];
+            const cid = sub.problem.contestId;
+            const name = sub.problem.name;
+            const link = `https://codeforces.com/problemset/problem/${sub.problem.contestId}/${sub.problem.index}`;
+            const key = pid;
+
+            // Track attempts
+            problemAttempts[key] = problemAttempts[key] || {
+              first: sub.creationTimeSeconds,
+              solved: null
+            };
+            if (sub.creationTimeSeconds < problemAttempts[key].first) {
+              problemAttempts[key].first = sub.creationTimeSeconds;
+            }
+            if (sub.verdict === "OK") {
+              if (
+                !problemAttempts[key].solved ||
+                sub.creationTimeSeconds < problemAttempts[key].solved
+              ) {
+                problemAttempts[key].solved = sub.creationTimeSeconds;
+              }
+            }
+
+            if (sub.verdict === "OK") {
+              if (!solvedSet.has(pid)) {
+                solvedSet.add(pid);
+
+                // Tags
+                tags.forEach(t => (tagCounts[t] = (tagCounts[t] || 0) + 1));
+
+                // Ratings
+                if (sub.problem.rating) {
+                  ratingCounts[sub.problem.rating] =
+                    (ratingCounts[sub.problem.rating] || 0) + 1;
+                } else {
+                  ratingCounts["Unknown"] = (ratingCounts["Unknown"] || 0) + 1;
+                }
+
+                // Contests
+                if (cid) {
+                  contests[cid] = contests[cid] || { solved: 0, total: 0 };
+                  contests[cid].solved++;
+                }
+              }
+            } else {
+              unsolvedSet.add(
+                pid + "|" + name + "|" + tags.join(",") + "|" + link
+              );
+              if (cid) {
+                contests[cid] = contests[cid] || { solved: 0, total: 0 };
+              }
+            }
+          });
+
+          // Tag Mastery
+          const totalSolved = solvedSet.size;
+          Object.entries(tagCounts)
+            .map(([tag, count]) => [
+              tag,
+              count,
+              ((count / totalSolved) * 100).toFixed(1)
+            ])
+            .sort((a, b) => b[2] - a[2])
+            .forEach(([tag, count, perc]) => {
+              tagMasteryTable.innerHTML += `
+                <tr><td class="p-2 border">${tag}</td><td class="p-2 border">${count}</td><td class="p-2 border">${perc}%</td></tr>`;
+            });
+
+          // Heatmap
+          Object.entries(ratingCounts)
+            .sort((a, b) => {
+              if (a[0] === "Unknown") return 1;
+              if (b[0] === "Unknown") return -1;
+              return parseInt(a[0]) - parseInt(b[0]);
+            })
+            .forEach(([rating, count]) => {
+              heatmapContent.innerHTML += `<div class="p-2 bg-blue-100 rounded text-center"><div class="font-bold">${rating}</div><div>${count}</div></div>`;
+            });
+
+          // Unsolved
+          unsolvedSet.forEach(str => {
+            const [pid, name, tags, link] = str.split("|");
+            unsolvedList.innerHTML += `<li class="bg-white p-2 rounded shadow">
+                <a href="${link}" target="_blank" class="text-blue-600 font-semibold">
+                  ${name}
+                </a>
+                <span class="text-gray-600">(${tags || "No tags"})</span>
+              </li>`;
+          });
+
+          // Speed
+          const tagTimes = {};
+          Object.entries(problemAttempts).forEach(([pid, obj]) => {
+            if (obj.solved) {
+              const diff = obj.solved - obj.first;
+              const minutes = Math.max(0, Math.round(diff / 60));
+              const problem = subs.find(
+                s => s.problem.contestId + s.problem.index === pid
+              ).problem;
+              (problem.tags || []).forEach(tag => {
+                tagTimes[tag] = tagTimes[tag] || [];
+                tagTimes[tag].push(minutes);
+              });
+            }
+          });
+          Object.entries(tagTimes).forEach(([tag, times]) => {
+            const avg = Math.round(
+              times.reduce((a, b) => a + b, 0) / times.length
+            );
+            speedTable.innerHTML += `<tr><td class="p-2 border">${tag}</td><td class="p-2 border">${times.length}</td><td class="p-2 border">${avg}</td></tr>`;
+          });
+
+          // Contests aggregated by Division
+          const contestAgg = {};
+          Object.entries(contests).forEach(([cid, obj]) => {
+            const name = contestMap[cid] || `Contest ${cid}`;
+            let div = "Other";
+            if (/Div\. ?1/i.test(name)) div = "Div. 1";
+            else if (/Div\. ?2/i.test(name)) div = "Div. 2";
+            else if (/Div\. ?3/i.test(name)) div = "Div. 3";
+            else if (/Div\. ?4/i.test(name)) div = "Div. 4";
+            contestAgg[div] = contestAgg[div] || { solved: 0, total: 0 };
+            contestAgg[div].solved += obj.solved;
+            contestAgg[div].total += obj.total + obj.solved;
+          });
+          Object.entries(contestAgg).forEach(([div, vals]) => {
+            const acc = vals.total
+              ? ((vals.solved / vals.total) * 100).toFixed(1) + "%"
+              : "-";
+            contestTable.innerHTML += `<tr><td class="p-2 border">${div}</td><td class="p-2 border">${vals.solved}</td><td class="p-2 border">${vals.total}</td><td class="p-2 border">${acc}</td></tr>`;
+          });
+
+          loading.classList.add("hidden");
+          resultsDiv.classList.remove("hidden");
+        } catch (err) {
+          loading.classList.add("hidden");
+          errorDiv.textContent = err.message;
+          errorDiv.classList.remove("hidden");
+        }
+      });
+    </script>
+  </body>
+</html>
