@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Codeforces Helper</title>
+    <title>Codeforces Headquarters</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   </head>
   <body class="bg-gray-100 min-h-screen">
@@ -11,7 +11,7 @@
     <header
       class="bg-blue-600 text-white text-center py-4 text-2xl font-bold shadow-md"
     >
-      Codeforces Helper
+      Codeforces Headquarters
     </header>
 
     <!-- Main -->
@@ -50,6 +50,11 @@
 
       <!-- Results -->
       <div id="results" class="hidden space-y-6">
+        <!-- User Info -->
+        <section id="info">
+          <h2 class="text-xl font-semibold mb-2">Info</h2>
+        </section>
+
         <!-- Tag Mastery -->
         <section id="tagMastery">
           <h2 class="text-xl font-semibold mb-2">Tag Mastery Index</h2>
@@ -131,6 +136,7 @@
     <script>
       const form = document.getElementById("form");
       const resultsDiv = document.getElementById("results");
+      const infoDiv = document.getElementById("info");
       const tagMasteryTable = document.getElementById("tagMasteryTable");
       const heatmapContent = document.getElementById("heatmapContent");
       const unsolvedList = document.getElementById("unsolvedList");
@@ -182,6 +188,22 @@
           if (data.status !== "OK")
             throw new Error(data.comment || "Failed to fetch data.");
           const subs = data.result;
+
+          const userRes = await fetch(
+            `https://codeforces.com/api/user.info?handles=${handle}`
+          );
+          const userData = await userRes.json();
+          if (userData.status !== "OK")
+            throw new Error(userData.comment || "Failed to fetch user info.");
+          const user = userData.result[0];
+
+          // Insert a div inside #info
+          info.innerHTML = `<div id="userInfo" class="bg-white p-4 rounded shadow-md mb-4">
+  <p><strong>Handle:</strong> ${user.handle}</p>
+  <p><strong>Rank:</strong> ${user.rank || "-"}</p>
+  <p><strong>Rating:</strong> ${user.rating || "-"}</p>
+  <p><strong>Max Rating:</strong> ${user.maxRating || "-"}</p>
+</div>`;
 
           // Contest names map
           const contestIds = [
@@ -256,7 +278,7 @@
               }
             } else {
               unsolvedSet.add(
-                pid + "|" + name + "|" + tags.join(",") + "|" + link
+                pid + "|" + name + "|" + tags.join(", ") + "|" + link
               );
               if (cid) {
                 contests[cid] = contests[cid] || { solved: 0, total: 0 };
@@ -331,9 +353,24 @@
             else if (/Div\. ?2/i.test(name)) div = "Div. 2";
             else if (/Div\. ?3/i.test(name)) div = "Div. 3";
             else if (/Div\. ?4/i.test(name)) div = "Div. 4";
+
+            // Get all problems in this contest
+            const problemsInContest = new Set(
+              subs
+                .filter(s => s.problem.contestId === parseInt(cid))
+                .map(s => s.problem.contestId + s.problem.index)
+            );
+            const totalProblems = problemsInContest.size;
+
+            // Count solved problems in this contest
+            let solvedCount = 0;
+            problemsInContest.forEach(pid => {
+              if (solvedSet.has(pid)) solvedCount++;
+            });
+
             contestAgg[div] = contestAgg[div] || { solved: 0, total: 0 };
-            contestAgg[div].solved += obj.solved;
-            contestAgg[div].total += obj.total + obj.solved;
+            contestAgg[div].solved += solvedCount;
+            contestAgg[div].total += totalProblems;
           });
           Object.entries(contestAgg).forEach(([div, vals]) => {
             const acc = vals.total
