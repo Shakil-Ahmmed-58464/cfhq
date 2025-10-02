@@ -37,10 +37,9 @@
       <div>
         <label class="block mb-2 font-semibold">Select Sections to Show:</label>
         <select id="sectionToggle" multiple class="w-full p-2 border rounded">
-          <option value="tagMastery" selected>Tag Mastery Index</option>
           <option value="heatmap" selected>Problem Rating Heatmap</option>
+          <option value="tagMastery" selected>Tag Mastery Index</option>
           <option value="unsolved" selected>Unsolved Problems</option>
-          <option value="speed" selected>Average Speed of Solving</option>
           <option value="contests" selected>Strongest Contest Rounds</option>
         </select>
         <p class="text-sm text-gray-500 mt-1">
@@ -53,6 +52,15 @@
         <!-- User Info -->
         <section id="info">
           <h2 class="text-xl font-semibold mb-2">Info</h2>
+        </section>
+
+        <!-- Heatmap -->
+        <section id="heatmap">
+          <h2 class="text-xl font-semibold mb-2">Problem Rating Heatmap</h2>
+          <div
+            id="heatmapContent"
+            class="grid grid-flow-col gap-2 overflow-x-auto"
+          ></div>
         </section>
 
         <!-- Tag Mastery -->
@@ -72,38 +80,10 @@
           </table>
         </section>
 
-        <!-- Heatmap -->
-        <section id="heatmap">
-          <h2 class="text-xl font-semibold mb-2">Problem Rating Heatmap</h2>
-          <div
-            id="heatmapContent"
-            class="grid grid-flow-col gap-2 overflow-x-auto"
-          ></div>
-        </section>
-
         <!-- Unsolved -->
         <section id="unsolved">
           <h2 class="text-xl font-semibold mb-2">Unsolved Problems</h2>
           <ul id="unsolvedList" class="space-y-2"></ul>
-        </section>
-
-        <!-- Speed -->
-        <section id="speed">
-          <h2 class="text-xl font-semibold mb-2">
-            Average Speed of Solving (by Tag)
-          </h2>
-          <table
-            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
-          >
-            <thead class="bg-gray-200">
-              <tr>
-                <th class="p-2 border">Tag</th>
-                <th class="p-2 border">Solved</th>
-                <th class="p-2 border">Avg Time to Solve (mins)</th>
-              </tr>
-            </thead>
-            <tbody id="speedTable"></tbody>
-          </table>
         </section>
 
         <!-- Contests -->
@@ -140,7 +120,6 @@
       const tagMasteryTable = document.getElementById("tagMasteryTable");
       const heatmapContent = document.getElementById("heatmapContent");
       const unsolvedList = document.getElementById("unsolvedList");
-      const speedTable = document.getElementById("speedTable");
       const contestTable = document.getElementById("contestTable");
       const loading = document.getElementById("loading");
       const errorDiv = document.getElementById("error");
@@ -151,13 +130,11 @@
         const selected = Array.from(sectionToggle.selectedOptions).map(
           o => o.value
         );
-        ["tagMastery", "heatmap", "unsolved", "speed", "contests"].forEach(
-          id => {
-            document.getElementById(id).style.display = selected.includes(id)
-              ? "block"
-              : "none";
-          }
-        );
+        ["tagMastery", "heatmap", "unsolved", "contests"].forEach(id => {
+          document.getElementById(id).style.display = selected.includes(id)
+            ? "block"
+            : "none";
+        });
       });
 
       form.addEventListener("submit", async e => {
@@ -167,7 +144,6 @@
         tagMasteryTable.innerHTML = "";
         heatmapContent.innerHTML = "";
         unsolvedList.innerHTML = "";
-        speedTable.innerHTML = "";
         contestTable.innerHTML = "";
         loading.classList.remove("hidden");
 
@@ -277,14 +253,28 @@
                 }
               }
             } else {
-              unsolvedSet.add(
-                pid + "|" + name + "|" + tags.join(", ") + "|" + link
-              );
+              if (!solvedSet.has(pid)) {
+                // ✅ FIX: only add unsolved if not in solved
+                unsolvedSet.add(
+                  pid + "|" + name + "|" + tags.join(", ") + "|" + link
+                );
+              }
               if (cid) {
                 contests[cid] = contests[cid] || { solved: 0, total: 0 };
               }
             }
           });
+
+          // Heatmap
+          Object.entries(ratingCounts)
+            .sort((a, b) => {
+              if (a[0] === "Unknown") return 1;
+              if (b[0] === "Unknown") return -1;
+              return parseInt(a[0]) - parseInt(b[0]);
+            })
+            .forEach(([rating, count]) => {
+              heatmapContent.innerHTML += `<div class="p-2 bg-blue-100 rounded text-center"><div class="font-bold">${rating}</div><div>${count}</div></div>`;
+            });
 
           // Tag Mastery
           const totalSolved = solvedSet.size;
@@ -300,17 +290,6 @@
                 <tr><td class="p-2 border">${tag}</td><td class="p-2 border">${count}</td><td class="p-2 border">${perc}%</td></tr>`;
             });
 
-          // Heatmap
-          Object.entries(ratingCounts)
-            .sort((a, b) => {
-              if (a[0] === "Unknown") return 1;
-              if (b[0] === "Unknown") return -1;
-              return parseInt(a[0]) - parseInt(b[0]);
-            })
-            .forEach(([rating, count]) => {
-              heatmapContent.innerHTML += `<div class="p-2 bg-blue-100 rounded text-center"><div class="font-bold">${rating}</div><div>${count}</div></div>`;
-            });
-
           // Unsolved
           unsolvedSet.forEach(str => {
             const [pid, name, tags, link] = str.split("|");
@@ -320,28 +299,6 @@
                 </a>
                 <span class="text-gray-600">(${tags || "No tags"})</span>
               </li>`;
-          });
-
-          // Speed
-          const tagTimes = {};
-          Object.entries(problemAttempts).forEach(([pid, obj]) => {
-            if (obj.solved) {
-              const diff = obj.solved - obj.first;
-              const minutes = Math.max(0, Math.round(diff / 60));
-              const problem = subs.find(
-                s => s.problem.contestId + s.problem.index === pid
-              ).problem;
-              (problem.tags || []).forEach(tag => {
-                tagTimes[tag] = tagTimes[tag] || [];
-                tagTimes[tag].push(minutes);
-              });
-            }
-          });
-          Object.entries(tagTimes).forEach(([tag, times]) => {
-            const avg = Math.round(
-              times.reduce((a, b) => a + b, 0) / times.length
-            );
-            speedTable.innerHTML += `<tr><td class="p-2 border">${tag}</td><td class="p-2 border">${times.length}</td><td class="p-2 border">${avg}</td></tr>`;
           });
 
           // Contests aggregated by Division
@@ -372,12 +329,22 @@
             contestAgg[div].solved += solvedCount;
             contestAgg[div].total += totalProblems;
           });
-          Object.entries(contestAgg).forEach(([div, vals]) => {
-            const acc = vals.total
-              ? ((vals.solved / vals.total) * 100).toFixed(1) + "%"
-              : "-";
-            contestTable.innerHTML += `<tr><td class="p-2 border">${div}</td><td class="p-2 border">${vals.solved}</td><td class="p-2 border">${vals.total}</td><td class="p-2 border">${acc}</td></tr>`;
-          });
+          Object.entries(contestAgg)
+            .map(([div, vals]) => ({
+              div,
+              solved: vals.solved,
+              total: vals.total,
+              acc: vals.total ? (vals.solved / vals.total) * 100 : 0
+            }))
+            .sort((a, b) => b.acc - a.acc) // descending accuracy
+            .forEach(obj => {
+              contestTable.innerHTML += `<tr>
+      <td class="p-2 border">${obj.div}</td>
+      <td class="p-2 border">${obj.solved}</td>
+      <td class="p-2 border">${obj.total}</td>
+      <td class="p-2 border">${obj.acc.toFixed(1)}%</td>
+    </tr>`;
+            });
 
           loading.classList.add("hidden");
           resultsDiv.classList.remove("hidden");
