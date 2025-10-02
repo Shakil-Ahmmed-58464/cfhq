@@ -66,18 +66,7 @@
         <!-- Tag Mastery -->
         <section id="tagMastery">
           <h2 class="text-xl font-semibold mb-2">Tag Mastery Index</h2>
-          <table
-            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
-          >
-            <thead class="bg-gray-200">
-              <tr>
-                <th class="p-2 border">Tag</th>
-                <th class="p-2 border">Solved</th>
-                <th class="p-2 border">%</th>
-              </tr>
-            </thead>
-            <tbody id="tagMasteryTable"></tbody>
-          </table>
+          <div id="tagMasteryTable" class="space-y-2"></div>
         </section>
 
         <!-- Unsolved -->
@@ -90,17 +79,27 @@
         <section id="contests">
           <h2 class="text-xl font-semibold mb-2">Strongest Contest Rounds</h2>
           <table
-            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md"
+            class="min-w-full border border-gray-300 bg-white rounded-lg shadow-md overflow-hidden"
           >
-            <thead class="bg-gray-200">
+            <thead class="bg-gray-100">
               <tr>
-                <th class="p-2 border">Division</th>
-                <th class="p-2 border">Solved</th>
-                <th class="p-2 border">Total</th>
-                <th class="p-2 border">Accuracy</th>
+                <th class="p-3 border border-gray-400 text-left text-gray-700 font-semibold">
+                  Division
+                </th>
+                <th class="p-3 border border-gray-400 text-center text-gray-700 font-semibold">
+                  Solved
+                </th>
+                <th class="p-3 border border-gray-400 text-center text-gray-700 font-semibold">
+                  Total
+                </th>
+                <th class="p-3 border border-gray-400 text-center text-gray-700 font-semibold">
+                  Accuracy
+                </th>
               </tr>
             </thead>
-            <tbody id="contestTable"></tbody>
+            <tbody id="contestTable" class="divide-y divide-gray-200">
+              <!-- Rows will be inserted dynamically -->
+            </tbody>
           </table>
         </section>
       </div>
@@ -287,7 +286,20 @@
             .sort((a, b) => b[2] - a[2])
             .forEach(([tag, count, perc]) => {
               tagMasteryTable.innerHTML += `
-                <tr><td class="p-2 border">${tag}</td><td class="p-2 border">${count}</td><td class="p-2 border">${perc}%</td></tr>`;
+  <div class="space-y-1">
+    <div class="flex justify-between text-sm font-medium">
+      <span class="capitalize">${tag}</span>
+      <span>${count} (${perc}%)</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+      <div 
+        class="h-3 rounded-full transition-all duration-700 ease-out"
+        style="width:${perc}%; 
+               background: linear-gradient(90deg, #3b82f6, #2563eb);">
+      </div>
+    </div>
+  </div>
+`;
             });
 
           // Unsolved
@@ -339,10 +351,10 @@
             .sort((a, b) => b.acc - a.acc) // descending accuracy
             .forEach(obj => {
               contestTable.innerHTML += `<tr>
-      <td class="p-2 border">${obj.div}</td>
-      <td class="p-2 border">${obj.solved}</td>
-      <td class="p-2 border">${obj.total}</td>
-      <td class="p-2 border">${obj.acc.toFixed(1)}%</td>
+      <td class="p-2 border border-gray-400">${obj.div}</td>
+      <td class="p-2 border border-gray-400">${obj.solved}</td>
+      <td class="p-2 border border-gray-400">${obj.total}</td>
+      <td class="p-2 border border-gray-400">${obj.acc.toFixed(1)}%</td>
     </tr>`;
             });
 
